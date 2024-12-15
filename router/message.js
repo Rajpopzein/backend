@@ -36,7 +36,9 @@ messageRouter.get("/:user1/:user2", async (req, res) => {
         { sender: user2, receiver: user1 },
       ],
     }).sort({ createdAt: 1 });
-
+    if(!messages.length === 0){
+      res.status(400).json({"messages": "Message not found"});
+    }
     res.status(200).json(messages);
   } catch (err) {
     res.status(500).json({ error: err.message });

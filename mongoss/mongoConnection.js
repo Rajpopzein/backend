@@ -1,8 +1,6 @@
 import mongoose from "mongoose"; // Ensure you load environment variables
 
-const dbUrl = "mongodb://localhost:27017/";
-
-const connectDB = async () => {
+const connectDB = async (dbUrl) => {
   try {
     await mongoose.connect(dbUrl, {
       useNewUrlParser: true,

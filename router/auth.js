@@ -30,6 +30,52 @@ const loginSchema = yup.object().shape({
   password: yup.string().required("Password is required"),
 });
 
+
+authRouter.put("/update/:id", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { username, email } = req.body;
+
+    
+    if (!username && !email) {
+      return res.status(400).json({ message: "At least one field (username or email) must be provided" });
+    }
+
+    
+    if (email) {
+      const existingUser = await User.findOne({ email });
+      if (existingUser && existingUser._id.toString() !== userId) {
+        return res.status(400).json({ message: "Email already in use by another user" });
+      }
+    }
+
+    
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { username, email },
+      { new: true, runValidators: true } 
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const token = jwt.sign(
+      { id: updatedUser._id, username: updatedUser.username, email: updatedUser.email },
+      "your_jwt_secret",
+      { expiresIn: "1h" }
+    );
+
+    res.status(200).json({
+      message: "User updated successfully",
+      token:token
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
 // Register route
 authRouter.post("/register", async (req, res) => {
   try {
@@ -37,19 +83,12 @@ authRouter.post("/register", async (req, res) => {
 
     const { username, email, password } = req.body;
 
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
-    console.log("Raw password:", password);
-    console.log("Hashed password:", hashedPassword);
-    console.log(password);
-
     // Check if the email already exists
     const previousUser = await User.findOne({ email });
     if (previousUser) {
       return res.status(400).json({ message: "Email already exists" });
     }
 
-    console.log("Hashed password:", hashedPassword);
 
     // Create a new user
     const user = new User({
@@ -90,7 +129,7 @@ authRouter.post("/login", async (req, res) => {
     // Generate a JWT token
     const token = jwt.sign(
       { id: user._id, username: user.username, email: user.email },
-      "your_jwt_secret", // Replace with a strong secret key in production
+      "your_jwt_secret",
       { expiresIn: "1h" }
     );
 

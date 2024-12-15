@@ -12,7 +12,8 @@ const initializeSocket = (server) => {
     },
   });
 
-  io.on("connection", (socket) => {
+  try{
+    io.on("connection", (socket) => {
     console.log(`User connected: ${socket.id}`);
     // Join a one-to-one or group chat room
     socket.on("joinRoom", ({ roomId }) => {
@@ -28,11 +29,47 @@ const initializeSocket = (server) => {
       const participants = [user1, user2];
       let room = await Rooms.findOne({ roomId: privateRoomId });
       if (!room) {
+        try{
         room = new Rooms({ participants, roomId: privateRoomId });
-        await room.save();
+        await room.save();  
+        }
+        catch (err) {
+          console.log("error saving room", err);
+        }
+        
       }
       console.log(`User ${socket.id} joined private room: ${privateRoomId}`);
     });
+    socket.on("joinGroup", async ({ roomId }) => {
+      socket.join(roomId);
+      console.log("Joined group", roomId);
+    });
+    socket.on(
+      "sendGroupMessage",
+      async ({ roomId, sender, content, mediaUrl }) => {
+        console.log(`User ${roomId} joined`);
+        try {
+          // Save the group message to the database
+          const message = new Message({
+            group: roomId,
+            sender,
+            content,
+            mediaUrl,
+          });
+          await message.save();
+          // Emit the group message to the room
+          io.to(roomId).emit("receiveGroupMessage", {
+            sender,
+            content,
+            mediaUrl,
+            createdAt: message.createdAt,
+          });
+        } catch (error) {
+          console.error("Error saving group message:", error);
+          socket.emit("error", "Failed to send group message");
+        }
+      }
+    );
 
     socket.on(
       "sendPrivateMessage",
@@ -65,37 +102,15 @@ const initializeSocket = (server) => {
       }
     );
 
-    socket.on(
-      "sendGroupMessage",
-      async ({ roomId, sender, content, mediaUrl }) => {
-        try {
-          // Save the group message to the database
-          const message = new Message({
-            group: roomId,
-            sender,
-            content,
-            mediaUrl,
-          });
-          await message.save();
-
-          // Emit the group message to the room
-          io.to(roomId).emit("receiveGroupMessage", {
-            sender,
-            content,
-            mediaUrl,
-            createdAt: message.createdAt,
-          });
-        } catch (error) {
-          console.error("Error saving group message:", error);
-          socket.emit("error", "Failed to send group message");
-        }
-      }
-    );
     // Handle user disconnect
     socket.on("disconnect", () => {
       console.log(`User disconnected: ${socket.id}`);
     });
   });
+  }
+  catch (error) {
+    console.error("Error in chat", error);
+  }
 };
 
 export default initializeSocket;
